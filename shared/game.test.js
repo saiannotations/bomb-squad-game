@@ -11,6 +11,11 @@ import {
   generateBomb,
   dealManualPages,
   expectedButtonAction,
+  createGameState,
+  applyWireCut,
+  applyKeypadPress,
+  applyButtonAction,
+  isDefused,
 } from "./game.js";
 
 // Tiny seeded PRNG so tests are deterministic.
@@ -124,5 +129,102 @@ describe("dealManualPages", () => {
       const rows = new Set(pages.flatMap((p) => p.button).map((b) => b.n));
       assert.equal(rows.size, 6);
     }
+  });
+});
+
+describe("action validation", () => {
+  it("defuses wires when cut in the secret order", () => {
+    const bomb = generateBomb(mulberry32(5));
+    const state = createGameState();
+    bomb.wires.order.forEach((color) => {
+      const idx = bomb.wires.display.indexOf(color);
+      const res = applyWireCut(bomb, state, idx);
+      assert.equal(res.ok, true);
+    });
+    assert.equal(state.wiresCut.every(Boolean), true);
+  });
+
+  it("strikes on a wrong wire and explodes on the third strike", () => {
+    const bomb = generateBomb(mulberry32(5));
+    const state = createGameState();
+    const wrongIdx = bomb.wires.display.findIndex((c) => c !== bomb.wires.order[0]);
+    for (let i = 0; i < 3; i++) {
+      const res = applyWireCut(bomb, state, wrongIdx);
+      assert.equal(res.ok, false);
+      assert.equal(res.strike, true);
+    }
+    assert.equal(state.over, "exploded");
+    assert.equal(state.strikes, 3);
+  });
+
+  it("does not strike for re-cutting an already cut wire", () => {
+    const bomb = generateBomb(mulberry32(5));
+    const state = createGameState();
+    const idx = bomb.wires.display.indexOf(bomb.wires.order[0]);
+    assert.equal(applyWireCut(bomb, state, idx).ok, true);
+    const res = applyWireCut(bomb, state, idx);
+    assert.equal(res.ok, false);
+    assert.equal(res.strike, undefined);
+    assert.equal(state.strikes, 0);
+  });
+
+  it("defuses the keypad in order and strikes on a wrong symbol", () => {
+    const bomb = generateBomb(mulberry32(6));
+    const state = createGameState();
+    bomb.keypad.order.slice(0, 3).forEach((s) => {
+      assert.equal(applyKeypadPress(bomb, state, s).ok, true);
+    });
+    const wrong = KEYPAD_SYMBOLS.find((s) => s !== bomb.keypad.order[3]);
+    const res = applyKeypadPress(bomb, state, wrong);
+    assert.equal(res.strike, true);
+    assert.equal(state.strikes, 1);
+    assert.equal(applyKeypadPress(bomb, state, bomb.keypad.order[3]).defused, true);
+  });
+
+  it("accepts the correct button action for every rule-table row", () => {
+    for (const rule of BUTTON_RULES) {
+      // find a color/label combo whose FIRST matching rule is this one
+      outer: for (const color of BUTTON_COLORS) {
+        for (const label of BUTTON_LABELS) {
+          if (BUTTON_RULES.find((r) => r.match(color, label)).n !== rule.n) continue;
+          const bomb = { button: { color, label, expected: rule.action } };
+          const state = createGameState();
+          const ms = rule.action === "hold" ? 3100 : 0;
+          const res = applyButtonAction(bomb, state, rule.action, ms);
+          assert.equal(res.ok, true, `rule ${rule.n} (${color}/${label})`);
+          assert.equal(res.defused, true);
+          break outer;
+        }
+      }
+    }
+  });
+
+  it("strikes on the wrong button action", () => {
+    const bomb = { button: { color: "BLUE", label: "PRESS", expected: "press" } };
+    const state = createGameState();
+    assert.equal(applyButtonAction(bomb, state, "double").strike, true);
+    assert.equal(applyButtonAction(bomb, state, "hold", 3100).strike, true);
+    assert.equal(state.strikes, 2);
+  });
+
+  it("enforces hold timing boundaries (2.0s - 4.5s)", () => {
+    const mk = () => ({ button: { color: "RED", label: "HOLD", expected: "hold" } });
+    assert.equal(applyButtonAction(mk(), createGameState(), "hold", 1999).strike, true);
+    assert.equal(applyButtonAction(mk(), createGameState(), "hold", 2000).ok, true);
+    assert.equal(applyButtonAction(mk(), createGameState(), "hold", 4500).ok, true);
+    assert.equal(applyButtonAction(mk(), createGameState(), "hold", 4501).strike, true);
+  });
+
+  it("reports defused only when all three modules are done", () => {
+    const bomb = generateBomb(mulberry32(9));
+    const state = createGameState();
+    assert.equal(isDefused(state), false);
+    bomb.wires.order.forEach((c) => applyWireCut(bomb, state, bomb.wires.display.indexOf(c)));
+    assert.equal(isDefused(state), false);
+    bomb.keypad.order.forEach((s) => applyKeypadPress(bomb, state, s));
+    assert.equal(isDefused(state), false);
+    const ms = bomb.button.expected === "hold" ? 3100 : 0;
+    applyButtonAction(bomb, state, bomb.button.expected, ms);
+    assert.equal(isDefused(state), true);
   });
 });
