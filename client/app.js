@@ -286,6 +286,19 @@ function renderGame(s) {
   $("#game-code").textContent = s.code;
   onTick(s.remaining != null ? s.remaining : 150);
 
+  // Strike feedback: flash + shake whenever the strike count goes up.
+  if (app.prevStrikes != null && s.strikes > app.prevStrikes) {
+    const flash = $("#strike-flash");
+    flash.classList.remove("show");
+    void flash.offsetWidth; // restart the animation
+    flash.classList.add("show");
+    document.body.classList.remove("shake");
+    void document.body.offsetWidth;
+    document.body.classList.add("shake");
+    setTimeout(() => document.body.classList.remove("shake"), 450);
+  }
+  app.prevStrikes = s.strikes;
+
   const strikes = "✖".repeat(s.strikes) + "○".repeat(Math.max(0, s.maxStrikes - s.strikes));
   $("#strikes").textContent = strikes.split("").join(" ");
 
