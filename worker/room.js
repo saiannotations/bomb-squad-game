@@ -316,3 +316,117 @@ export class GameRoom {
 
   // -- The rest (timer, actions, bots) lands in the next commits ------------
 }
+
+// --- Bot teammates ----------------------------------------------------------
+// Bots are fair players: each bot only ever sees its OWN manual page
+// (dealt by dealManualPages like everyone else). They share what they know
+// by posting clue fragments to chat on a schedule, so a solo human plus
+// two bots can win using only the posted clues.
+
+const BOT_STRIKE_REACTIONS = [
+  "Ouch. Slow down, team — read the manual out loud first.",
+  "That was a strike. Let's double-check the next move together.",
+  "Careful! Talk it through before anyone touches anything.",
+];
+
+const BOT_WIN_LINES = [
+  "WE DID IT! Drinks are on me. (I don't drink. Neither do you. Fine.)",
+  "Bomb defused! That teamwork was beautiful.",
+  "Another day, another bomb. Great work, squad!",
+];
+
+const BOT_LOSE_LINES = [
+  "Boom. Good try, team — we'll get the next one.",
+  "Well... that was loud. Rematch?",
+];
+
+function botClueMessages(bot, page) {
+  const out = [];
+  if (page.wires.length) {
+    out.push(`My wires page says: ${page.wires.map((w) => w.text).join(" ")}`);
+  }
+  page.keypad.forEach((k) => out.push(`Keypad clue from my manual: ${k.text}`));
+  if (page.button.length) {
+    out.push(
+      `Button rules on my page: ${page.button
+        .map((b) => `rule ${b.n} (if ${b.condition} -> ${BUTTON_ACTION_NAMES[b.action]})`)
+        .join("; ")}`
+    );
+  }
+  return out.map((text) => ({ from: bot.name, text }));
+}
+
+// Methods below are monkey-patched onto GameRoom.prototype so the file
+// stays organized by commit. (They run in the same class scope.)
+Object.assign(GameRoom.prototype, {
+  buildBotScript(g) {
+    const queue = [];
+    const now = Date.now();
+    let at = now + 3000;
+    for (const bot of g.players.filter((p) => p.isBot)) {
+      for (const m of botClueMessages(bot, g.pages[bot.id])) {
+        queue.push({ at, from: m.from, text: m.text });
+        at += 4000;
+      }
+    }
+    return queue;
+  },
+
+  queueBotChat(name, text, delayMs) {
+    this.game.botQueue.push({ at: Date.now() + delayMs, from: name, text });
+  },
+
+  randomBot() {
+    const bots = this.game.players.filter((p) => p.isBot);
+    return bots.length ? pick(bots) : null;
+  },
+
+  // Server-authoritative 1-second tick. Drives the countdown, the tick
+  // broadcast, and all scheduled bot messages. Bare setTimeout is never
+  // used for game correctness — alarms survive hibernation.
+  async alarm() {
+    const g = this.game;
+    if (!g || g.phase !== "PLAYING") return;
+    const now = Date.now();
+
+    const due = g.botQueue.filter((m) => m.at <= now);
+    g.botQueue = g.botQueue.filter((m) => m.at > now);
+    for (const m of due) this.chat(m.from, m.text);
+
+    const remaining = Math.max(0, Math.round((g.endsAt - now) / 1000));
+    this.broadcast({ t: "tick", remaining });
+
+    if (remaining <= 0) {
+      await this.explode("Time ran out.");
+      return;
+    }
+    await this.save();
+    await this.ctx.storage.setAlarm(now + 1000);
+  },
+
+  async explode(reason) {
+    const g = this.game;
+    g.phase = "LOST";
+    g.loseReason = reason;
+    g.state.over = "exploded";
+    g.botQueue = [];
+    const bot = this.randomBot();
+    if (bot) this.chat(bot.name, pick(BOT_LOSE_LINES));
+    this.chat("SYSTEM", `💥 BOOM. ${reason}`);
+    await this.save();
+    this.broadcastState();
+    this.broadcast({ t: "result", win: false, reason });
+  },
+
+  async winGame() {
+    const g = this.game;
+    g.phase = "WON";
+    g.botQueue = [];
+    const bot = this.randomBot();
+    if (bot) this.chat(bot.name, pick(BOT_WIN_LINES));
+    this.chat("SYSTEM", "✅ Bomb defused with time to spare. Outstanding work, squad.");
+    await this.save();
+    this.broadcastState();
+    this.broadcast({ t: "result", win: true, reason: "All three modules defused." });
+  },
+});
