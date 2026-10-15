@@ -22,6 +22,23 @@ import {
 const BOT_NAMES = ["Rook-7", "Vex-3", "Pip-9", "Nova-2", "Juno-5", "Kai-8"];
 const MAX_PLAYERS = 3;
 
+const BOT_STRIKE_REACTIONS = [
+  "Ouch. Slow down, team — read the manual out loud first.",
+  "That was a strike. Let's double-check the next move together.",
+  "Careful! Talk it through before anyone touches anything.",
+];
+
+const BOT_WIN_LINES = [
+  "WE DID IT! That teamwork was beautiful.",
+  "Bomb defused! Another day, another bomb.",
+  "We make a great squad. Who's up for another round?",
+];
+
+const BOT_LOSE_LINES = [
+  "Boom. Good try, team — we'll get the next one.",
+  "Well... that was loud. Rematch?",
+];
+
 function uid() {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
@@ -30,6 +47,26 @@ function uid() {
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Bots are fair players: each bot only ever sees its OWN manual page
+// (dealt by dealManualPages like everyone else). They share what they know
+// by posting clue fragments to chat on a schedule, so a solo human plus
+// two bots can win using only the posted clues.
+function botClueMessages(bot, page) {
+  const out = [];
+  if (page.wires.length) {
+    out.push(`My wires page says: ${page.wires.map((w) => w.text).join(" ")}`);
+  }
+  page.keypad.forEach((k) => out.push(`Keypad clue from my manual: ${k.text}`));
+  if (page.button.length) {
+    out.push(
+      `Button rules on my page: ${page.button
+        .map((b) => `rule ${b.n} (if ${b.condition} -> ${BUTTON_ACTION_NAMES[b.action]})`)
+        .join("; ")}`
+    );
+  }
+  return out.map((text) => ({ from: bot.name, text }));
 }
 
 export class GameRoom {
@@ -141,20 +178,6 @@ export class GameRoom {
     this.broadcast({ t: "chat", from, text: String(text).slice(0, 300) });
   }
 
-  sendTo(playerId, msg) {
-    const data = JSON.stringify(msg);
-    for (const ws of this.ctx.getWebSockets()) {
-      const att = ws.deserializeAttachment() || {};
-      if (att.id === playerId) {
-        try {
-          ws.send(data);
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }
-
   async webSocketMessage(ws, raw) {
     let msg;
     try {
@@ -169,8 +192,10 @@ export class GameRoom {
           await this.onJoin(ws, msg);
           break;
         case "chat":
-          if (me.id) this.chat(me.name || "Player", msg.text);
-          await this.save();
+          if (me.id) {
+            this.chat(me.name || "Player", msg.text);
+            await this.save();
+          }
           break;
         case "add_bot":
           this.onAddBot(me);
@@ -257,7 +282,7 @@ export class GameRoom {
     await this.save();
   }
 
-  onAddBot(requester) {
+  onAddBot() {
     const g = this.game;
     if (!g || g.phase !== "LOBBY" || g.players.length >= MAX_PLAYERS) return;
     const used = new Set(g.players.map((p) => p.name));
@@ -314,51 +339,8 @@ export class GameRoom {
     await this.ctx.storage.setAlarm(Date.now() + 1000);
   }
 
-  // -- The rest (timer, actions, bots) lands in the next commits ------------
-}
+  // -- Bots -------------------------------------------------------------------
 
-// --- Bot teammates ----------------------------------------------------------
-// Bots are fair players: each bot only ever sees its OWN manual page
-// (dealt by dealManualPages like everyone else). They share what they know
-// by posting clue fragments to chat on a schedule, so a solo human plus
-// two bots can win using only the posted clues.
-
-const BOT_STRIKE_REACTIONS = [
-  "Ouch. Slow down, team — read the manual out loud first.",
-  "That was a strike. Let's double-check the next move together.",
-  "Careful! Talk it through before anyone touches anything.",
-];
-
-const BOT_WIN_LINES = [
-  "WE DID IT! Drinks are on me. (I don't drink. Neither do you. Fine.)",
-  "Bomb defused! That teamwork was beautiful.",
-  "Another day, another bomb. Great work, squad!",
-];
-
-const BOT_LOSE_LINES = [
-  "Boom. Good try, team — we'll get the next one.",
-  "Well... that was loud. Rematch?",
-];
-
-function botClueMessages(bot, page) {
-  const out = [];
-  if (page.wires.length) {
-    out.push(`My wires page says: ${page.wires.map((w) => w.text).join(" ")}`);
-  }
-  page.keypad.forEach((k) => out.push(`Keypad clue from my manual: ${k.text}`));
-  if (page.button.length) {
-    out.push(
-      `Button rules on my page: ${page.button
-        .map((b) => `rule ${b.n} (if ${b.condition} -> ${BUTTON_ACTION_NAMES[b.action]})`)
-        .join("; ")}`
-    );
-  }
-  return out.map((text) => ({ from: bot.name, text }));
-}
-
-// Methods below are monkey-patched onto GameRoom.prototype so the file
-// stays organized by commit. (They run in the same class scope.)
-Object.assign(GameRoom.prototype, {
   buildBotScript(g) {
     const queue = [];
     const now = Date.now();
@@ -370,20 +352,22 @@ Object.assign(GameRoom.prototype, {
       }
     }
     return queue;
-  },
+  }
 
   queueBotChat(name, text, delayMs) {
     this.game.botQueue.push({ at: Date.now() + delayMs, from: name, text });
-  },
+  }
 
   randomBot() {
     const bots = this.game.players.filter((p) => p.isBot);
     return bots.length ? pick(bots) : null;
-  },
+  }
 
-  // Server-authoritative 1-second tick. Drives the countdown, the tick
+  // -- Server-authoritative timer ----------------------------------------------
+  // One-second tick via storage alarms. Drives the countdown, the tick
   // broadcast, and all scheduled bot messages. Bare setTimeout is never
   // used for game correctness — alarms survive hibernation.
+
   async alarm() {
     const g = this.game;
     if (!g || g.phase !== "PLAYING") return;
@@ -402,7 +386,7 @@ Object.assign(GameRoom.prototype, {
     }
     await this.save();
     await this.ctx.storage.setAlarm(now + 1000);
-  },
+  }
 
   async explode(reason) {
     const g = this.game;
@@ -412,11 +396,11 @@ Object.assign(GameRoom.prototype, {
     g.botQueue = [];
     const bot = this.randomBot();
     if (bot) this.chat(bot.name, pick(BOT_LOSE_LINES));
-    this.chat("SYSTEM", `💥 BOOM. ${reason}`);
+    this.chat("SYSTEM", `BOOM. ${reason}`);
     await this.save();
     this.broadcastState();
     this.broadcast({ t: "result", win: false, reason });
-  },
+  }
 
   async winGame() {
     const g = this.game;
@@ -424,9 +408,56 @@ Object.assign(GameRoom.prototype, {
     g.botQueue = [];
     const bot = this.randomBot();
     if (bot) this.chat(bot.name, pick(BOT_WIN_LINES));
-    this.chat("SYSTEM", "✅ Bomb defused with time to spare. Outstanding work, squad.");
+    this.chat("SYSTEM", "Bomb defused with time to spare. Outstanding work, squad.");
     await this.save();
     this.broadcastState();
     this.broadcast({ t: "result", win: true, reason: "All three modules defused." });
-  },
-});
+  }
+
+  // -- Player actions ----------------------------------------------------------
+
+  async onAction(me, msg) {
+    const g = this.game;
+    if (!g || g.phase !== "PLAYING") return;
+    const player = g.players.find((p) => p.id === me.id && !p.isBot);
+    if (!player) return; // bots never act; only attached humans
+
+    const st = g.state;
+    let res = null;
+    let moduleName = "";
+    if (msg.module === "wires") {
+      res = applyWireCut(g.bomb, st, msg.wire);
+      moduleName = "Wires";
+    } else if (msg.module === "keypad") {
+      res = applyKeypadPress(g.bomb, st, msg.symbol);
+      moduleName = "Keypad";
+    } else if (msg.module === "button") {
+      res = applyButtonAction(g.bomb, st, msg.kind, msg.ms);
+      moduleName = "Button";
+    } else {
+      return;
+    }
+
+    if (res.strike) {
+      this.chat("SYSTEM", `Strike ${st.strikes}/${MAX_STRIKES}!`);
+      const bot = this.randomBot();
+      if (bot) this.queueBotChat(bot.name, pick(BOT_STRIKE_REACTIONS), 1200);
+    }
+    if (res.defused) {
+      this.chat("SYSTEM", `${moduleName} defused by ${player.name}!`);
+      const bot = this.randomBot();
+      if (bot && bot.name !== player.name) {
+        this.queueBotChat(bot.name, `Nice work, ${player.name}! ${moduleName} is done.`, 1500);
+      }
+    }
+
+    if (st.over === "exploded") {
+      await this.explode("Three strikes.");
+    } else if (isDefused(st)) {
+      await this.winGame();
+    } else {
+      await this.save();
+      this.broadcastState();
+    }
+  }
+}
