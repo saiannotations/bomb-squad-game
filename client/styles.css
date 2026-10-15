@@ -1,0 +1,239 @@
+/* Bomb Squad — vanilla CSS, no build step. Mobile-friendly stacking at the end. */
+
+:root {
+  --bg: #14161c;
+  --card: #1e2230;
+  --ink: #f2f4f8;
+  --muted: #9aa3b5;
+  --accent: #ffb020;
+  --danger: #ff4d5e;
+  --ok: #3ddc84;
+  --line: #2c3347;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.topbar {
+  text-align: center;
+  padding: 1.2rem 1rem 0.4rem;
+}
+.topbar h1 { margin: 0; font-size: 2rem; }
+.tagline { color: var(--muted); margin: 0.3rem 0 0; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+
+.screen.hidden, .hidden { display: none !important; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 480px;
+  margin: 1rem auto;
+}
+
+.card h2 { margin-top: 0; }
+
+label { display: block; margin: 0.8rem 0; font-size: 0.95rem; }
+input[type="text"] {
+  display: block;
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #12151d;
+  color: var(--ink);
+  font-size: 1rem;
+}
+input[type="text"]#input-code { text-transform: uppercase; }
+
+.row { display: flex; gap: 0.6rem; margin-top: 0.8rem; flex-wrap: wrap; }
+
+button {
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #2a3044;
+  color: var(--ink);
+  font-size: 1rem;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.15); }
+button.primary { background: var(--accent); color: #1a1206; border: none; font-weight: 700; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.divider { display: flex; align-items: center; gap: 0.6rem; color: var(--muted); margin: 1rem 0; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+.error { color: var(--danger); min-height: 1.2em; }
+.hint { color: var(--muted); font-size: 0.9rem; }
+.roomcode {
+  font-family: ui-monospace, monospace;
+  background: #12151d;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  padding: 0.1rem 0.5rem;
+  letter-spacing: 0.15em;
+}
+
+.howto { margin-top: 1.2rem; color: var(--muted); font-size: 0.92rem; }
+.howto summary { cursor: pointer; color: var(--ink); }
+
+.players { list-style: none; padding: 0; margin: 1rem 0; }
+.players li {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 0.4rem;
+  display: flex;
+  justify-content: space-between;
+}
+.badge {
+  font-size: 0.75rem;
+  border-radius: 20px;
+  padding: 0.1rem 0.6rem;
+  background: #2a3044;
+  color: var(--muted);
+}
+.badge.bot { background: #3a2f5a; color: #c9b8ff; }
+.badge.host { background: #4a3a1a; color: var(--accent); }
+.badge.offline { background: #3a2026; color: var(--danger); }
+
+/* ---- game screen ---- */
+.gamebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 1.2rem;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+}
+.timer { font-family: ui-monospace, monospace; font-size: 1.6rem; font-weight: 700; }
+.timer.low { color: var(--danger); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.5; } }
+.strikes { letter-spacing: 0.2em; color: var(--danger); font-size: 1.3rem; }
+
+.gamegrid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.bomb {
+  background: linear-gradient(160deg, #232838, #181c26);
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  padding: 1.2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.module {
+  background: #141821;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1rem;
+}
+.module h3 { margin: 0 0 0.7rem; font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.module.done { border-color: var(--ok); }
+.module.done h3::after { content: " ✓ defused"; color: var(--ok); text-transform: none; letter-spacing: 0; }
+
+.wires { display: flex; flex-direction: column; gap: 0.55rem; }
+.wire {
+  height: 26px;
+  border-radius: 13px;
+  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.25);
+  transition: transform 0.1s;
+}
+.wire:hover { transform: scaleY(1.25); }
+.wire.cut { opacity: 0.25; cursor: default; filter: grayscale(0.8); }
+.wire.RED { background: #e5484d; } .wire.BLUE { background: #3e8ef7; }
+.wire.GREEN { background: #3ddc84; } .wire.YELLOW { background: #ffd60a; }
+.wire.WHITE { background: #e8e8e8; }
+
+.keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.key {
+  aspect-ratio: 1;
+  font-size: 1.6rem;
+  border-radius: 10px;
+}
+.key.pressed { background: var(--ok); color: #06210f; border: none; }
+
+.bigbutton {
+  width: 150px; height: 150px;
+  border-radius: 50%;
+  font-size: 1.2rem; font-weight: 800;
+  margin: 0 auto; display: block;
+  border: 4px solid rgba(255,255,255,0.3);
+  color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+.bigbutton.RED { background: #c93338; } .bigbutton.BLUE { background: #2f6fd0; }
+.bigbutton.GREEN { background: #2ba866; } .bigbutton.YELLOW { background: #d9a900; }
+.bigbutton:active { transform: scale(0.96); }
+
+.sidepanel { display: flex; flex-direction: column; gap: 1rem; }
+
+.manual, .chat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.manual h3, .chat h3 { margin: 0 0 0.6rem; font-size: 1rem; }
+.private { color: var(--muted); font-weight: 400; font-size: 0.8rem; }
+.manual ul { margin: 0.3rem 0 0.8rem; padding-left: 1.2rem; }
+.manual li { margin-bottom: 0.25rem; }
+.manual h4 { margin: 0.7rem 0 0.2rem; color: var(--accent); font-size: 0.9rem; }
+
+.chatlog {
+  height: 220px;
+  overflow-y: auto;
+  background: #12151d;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.92rem;
+}
+.chatlog .sys { color: var(--muted); font-style: italic; }
+.chatlog .who { font-weight: 700; color: var(--accent); }
+.chatrow { display: flex; gap: 0.5rem; }
+.chatrow input { flex: 1; margin: 0; }
+
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10;
+}
+.overlay .card { text-align: center; }
+.overlay.win h2 { color: var(--ok); }
+.overlay.lose h2 { color: var(--danger); }
+
+.toast {
+  position: fixed; bottom: 1rem; left: 50%;
+  transform: translateX(-50%);
+  background: var(--danger); color: #fff;
+  padding: 0.6rem 1.2rem; border-radius: 8px;
+  z-index: 20;
+}
+
+/* Mobile: stack the side panel under the bomb. (Expanded in a later PR.) */
+@media (max-width: 860px) {
+  .gamegrid { grid-template-columns: 1fr; }
+}

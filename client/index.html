@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bomb Squad — co-op bomb defusal</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>💣 Bomb Squad</h1>
+    <p class="tagline">One bomb. Three players. 150 seconds. Talk to each other.</p>
+  </header>
+
+  <main>
+    <!-- HOME: enter name, create or join a room -->
+    <section id="screen-home" class="screen">
+      <div class="card">
+        <h2>Join the squad</h2>
+        <label>
+          Your name
+          <input id="input-name" type="text" maxlength="20" placeholder="e.g. Alex" autocomplete="off" />
+        </label>
+        <div class="row">
+          <button id="btn-create" class="primary">Create room</button>
+        </div>
+        <div class="divider"><span>or</span></div>
+        <label>
+          Room code
+          <input id="input-code" type="text" maxlength="4" placeholder="e.g. KQZT" autocomplete="off" />
+        </label>
+        <div class="row">
+          <button id="btn-join" class="primary">Join room</button>
+        </div>
+        <div id="rejoin-banner" class="hidden">
+          <p>You were in room <strong id="rejoin-code"></strong>.</p>
+          <button id="btn-rejoin">Rejoin</button>
+        </div>
+        <p id="home-error" class="error"></p>
+        <details class="howto">
+          <summary>How to play</summary>
+          <ul>
+            <li>Defuse all <strong>3 modules</strong> (wires, keypad, button) before the timer hits zero.</li>
+            <li><strong>3 strikes</strong> and the bomb goes off. Wrong moves cost strikes.</li>
+            <li>Each player gets a <strong>private manual page</strong> — nobody sees the whole picture. Share clues in chat!</li>
+            <li>Playing solo? Add <strong>bots</strong> — they'll share their manual pages in chat.</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <!-- LOBBY: room code, players, add bot, start -->
+    <section id="screen-lobby" class="screen hidden">
+      <div class="card">
+        <h2>Room <span id="lobby-code" class="roomcode">????</span></h2>
+        <p class="hint">Share this code with your squad. First player in is the host.</p>
+        <ul id="player-list" class="players"></ul>
+        <div class="row">
+          <button id="btn-add-bot">Add bot</button>
+          <button id="btn-start" class="primary hidden">Start game</button>
+        </div>
+        <p id="lobby-error" class="error"></p>
+      </div>
+    </section>
+
+    <!-- GAME: bomb, manual, chat -->
+    <section id="screen-game" class="screen hidden">
+      <div class="gamebar">
+        <div class="roomcode" id="game-code">????</div>
+        <div class="timer" id="timer">2:30</div>
+        <div class="strikes" id="strikes" title="Strikes">○ ○ ○</div>
+      </div>
+      <div class="gamegrid">
+        <div class="bomb" id="bomb">
+          <!-- modules render here -->
+        </div>
+        <aside class="sidepanel">
+          <div class="manual" id="manual">
+            <h3>📖 Your manual page <span class="private">(private)</span></h3>
+            <div id="manual-body"><p class="hint">Waiting for the game to start…</p></div>
+          </div>
+          <div class="chat">
+            <h3>💬 Squad chat</h3>
+            <div id="chat-log" class="chatlog"></div>
+            <div class="chatrow">
+              <input id="chat-input" type="text" maxlength="300" placeholder="Share your clues…" autocomplete="off" />
+              <button id="btn-send">Send</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+      <div id="result-overlay" class="overlay hidden">
+        <div class="card">
+          <h2 id="result-title"></h2>
+          <p id="result-reason"></p>
+          <button id="btn-back-lobby" class="primary">Back to home</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
