@@ -68,3 +68,67 @@ export function generateBomb(rand = Math.random) {
     button: { color, label, expected: expectedButtonAction(color, label) },
   };
 }
+
+const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th"];
+
+// Deal one private "manual page" per player.
+//
+// The clues are a PARTITION of the facts: put all pages together and you can
+// solve every module, but no single page reveals everything (fair play —
+// bots get the same kind of page as humans and never see anyone else's).
+//
+// - WIRES: the 5 cut positions are split up. 3 players -> {1st}, {5th},
+//   {2nd,3rd,4th}. 2 players -> {1st,5th}, {2nd,3rd,4th}. 1 player -> all.
+// - KEYPAD: each player learns 2 of the 4 symbol positions (cycling).
+// - BUTTON: the 6 rule-table rows are split up. 3 players -> 2 rows each.
+export function dealManualPages(bomb, playerCount) {
+  const n = Math.max(1, Math.min(3, playerCount));
+  const pages = Array.from({ length: n }, () => ({ wires: [], keypad: [], button: [] }));
+
+  const wireSplits = {
+    1: [[0, 1, 2, 3, 4]],
+    2: [[0, 4], [1, 2, 3]],
+    3: [[0], [4], [1, 2, 3]],
+  }[n];
+  wireSplits.forEach((positions, i) => {
+    positions.forEach((p) => {
+      const color = bomb.wires.order[p];
+      pages[i].wires.push({
+        color,
+        position: p,
+        text: `Cut ${color} ${ORDINALS[p]}.`,
+      });
+    });
+  });
+
+  for (let i = 0; i < n; i++) {
+    const positions = n === 1 ? [0, 1, 2, 3] : [(2 * i) % 4, (2 * i + 1) % 4];
+    positions.forEach((p) => {
+      const symbol = bomb.keypad.order[p];
+      pages[i].keypad.push({
+        position: p,
+        symbol,
+        text: `Keypad position ${p + 1} is ${symbol}.`,
+      });
+    });
+  }
+
+  const buttonSplits = {
+    1: [[0, 1, 2, 3, 4, 5]],
+    2: [[0, 1, 2], [3, 4, 5]],
+    3: [[0, 1], [2, 3], [4, 5]],
+  }[n];
+  buttonSplits.forEach((rows, i) => {
+    rows.forEach((r) => {
+      const rule = BUTTON_RULES[r];
+      pages[i].button.push({
+        n: rule.n,
+        condition: rule.condition,
+        action: rule.action,
+        text: `Rule ${rule.n}: if ${rule.condition}, ${BUTTON_ACTION_NAMES[rule.action]}.`,
+      });
+    });
+  });
+
+  return pages;
+}
