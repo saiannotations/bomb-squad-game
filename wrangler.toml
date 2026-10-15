@@ -1,0 +1,17 @@
+name = "bomb-squad-game"
+main = "worker/index.js"
+compatibility_date = "2026-10-01"
+
+# WebSocket game rooms. One Durable Object instance per room code.
+[[durable_objects.bindings]]
+name = "GAME_ROOMS"
+class_name = "GameRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["GameRoom"]
+
+# The vanilla-JS client is served straight from ./client — no build step.
+[assets]
+directory = "./client"
+binding = "ASSETS"
