@@ -330,8 +330,73 @@ function renderGame(s) {
   renderManual();
 }
 
-// -- Manual panel, module interactions, chat land in the next commits --------
-function renderManual() {}
-function wireButtonInteractions() {}
+// -- Manual panel (private!) --------------------------------------------------
+// Your manual page arrives in a {t:"manual"} message addressed only to you.
+// Never paste the other players' pages — but DO share your own clues.
+
+function renderManual() {
+  const body = $("#manual-body");
+  if (!app.manual) {
+    body.innerHTML = '<p class="hint">Waiting for the game to start…</p>';
+    return;
+  }
+  const m = app.manual;
+  body.innerHTML = "";
+
+  const addSection = (title, items, fmt) => {
+    const h = document.createElement("h4");
+    h.textContent = title;
+    body.appendChild(h);
+    const ul = document.createElement("ul");
+    items.forEach((it) => {
+      const li = document.createElement("li");
+      li.textContent = fmt(it);
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+  };
+
+  addSection("Wires", m.wires, (w) => w.text);
+  addSection("Keypad", m.keypad, (k) => k.text);
+  addSection("Button", m.button, (b) => b.text);
+}
+
+// -- Button interactions: click = press, hold = hold 3s, double-click = twice
+function wireButtonInteractions(big) {
+  if (!big || big.disabled) return;
+  let downAt = 0;
+  let tapTimer = null;
+
+  big.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    downAt = performance.now();
+  });
+
+  big.addEventListener("pointerup", () => {
+    const ms = Math.round(performance.now() - downAt);
+    if (ms >= 700) {
+      // A real hold — report how long it was held.
+      send({ t: "action", module: "button", kind: "hold", ms });
+      return;
+    }
+    // A tap: wait briefly to see if it's the first half of a double-tap.
+    if (tapTimer) {
+      clearTimeout(tapTimer);
+      tapTimer = null;
+      send({ t: "action", module: "button", kind: "double" });
+    } else {
+      tapTimer = setTimeout(() => {
+        tapTimer = null;
+        send({ t: "action", module: "button", kind: "press" });
+      }, 320);
+    }
+  });
+
+  big.addEventListener("pointerleave", () => {
+    downAt = 0;
+  });
+}
+
+// -- Chat and result land in the next commit --------------------------------
 function onChat() {}
 function onResult() {}
