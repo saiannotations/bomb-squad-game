@@ -132,3 +132,79 @@ export function dealManualPages(bomb, playerCount) {
 
   return pages;
 }
+
+// --- Action validation ------------------------------------------------------
+// All functions mutate `state` and return a result object:
+//   { ok: true, defused } on success,
+//   { ok: false, strike: true, reason } on a wrong move (adds a strike),
+//   { ok: false, reason } on a no-op (no strike).
+// Three strikes sets state.over = "exploded".
+
+export function createGameState() {
+  return {
+    strikes: 0,
+    wiresCut: [false, false, false, false, false],
+    keypadPressed: [],
+    buttonDone: false,
+    over: null, // null | "exploded"
+  };
+}
+
+function registerStrike(state) {
+  state.strikes += 1;
+  if (state.strikes >= MAX_STRIKES) state.over = "exploded";
+}
+
+export function applyWireCut(bomb, state, displayIndex) {
+  if (state.over) return { ok: false, reason: "game over" };
+  if (!Number.isInteger(displayIndex) || displayIndex < 0 || displayIndex >= 5) {
+    return { ok: false, reason: "no such wire" };
+  }
+  if (state.wiresCut[displayIndex]) return { ok: false, reason: "already cut" };
+  const cutCount = state.wiresCut.filter(Boolean).length;
+  if (bomb.wires.display[displayIndex] === bomb.wires.order[cutCount]) {
+    state.wiresCut[displayIndex] = true;
+    return { ok: true, defused: state.wiresCut.every(Boolean) };
+  }
+  registerStrike(state);
+  return { ok: false, strike: true, reason: "wrong wire" };
+}
+
+export function applyKeypadPress(bomb, state, symbol) {
+  if (state.over) return { ok: false, reason: "game over" };
+  if (state.keypadPressed.length >= 4) return { ok: false, reason: "already solved" };
+  if (bomb.keypad.order[state.keypadPressed.length] === symbol) {
+    state.keypadPressed.push(symbol);
+    return { ok: true, defused: state.keypadPressed.length === 4 };
+  }
+  registerStrike(state);
+  return { ok: false, strike: true, reason: "wrong symbol" };
+}
+
+export function applyButtonAction(bomb, state, kind, ms = 0) {
+  if (state.over) return { ok: false, reason: "game over" };
+  if (state.buttonDone) return { ok: false, reason: "already solved" };
+  const expected = bomb.button.expected;
+  let correct = false;
+  if (expected === "hold" && kind === "hold") {
+    correct = ms >= HOLD_MIN_MS && ms <= HOLD_MAX_MS;
+  } else if (expected === "press" && kind === "press") {
+    correct = true;
+  } else if (expected === "double" && kind === "double") {
+    correct = true;
+  }
+  if (correct) {
+    state.buttonDone = true;
+    return { ok: true, defused: true };
+  }
+  registerStrike(state);
+  return { ok: false, strike: true, reason: "wrong action" };
+}
+
+export function isDefused(state) {
+  return (
+    state.wiresCut.every(Boolean) &&
+    state.keypadPressed.length === 4 &&
+    state.buttonDone
+  );
+}
