@@ -251,7 +251,24 @@ body.shake { animation: screenshake 0.4s; }
   z-index: 20;
 }
 
-/* Mobile: stack the side panel under the bomb. (Expanded in a later PR.) */
+/* Mobile: stack the side panel under the bomb, keep the timer visible,
+   and grow touch targets. */
 @media (max-width: 860px) {
   .gamegrid { grid-template-columns: 1fr; }
+
+  .gamebar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .wire { height: 34px; border-radius: 17px; }
+  .key { font-size: 2rem; min-height: 64px; }
+  .bigbutton { width: 170px; height: 170px; }
+
+  .chatlog { height: 160px; }
+
+  /* Manual first, chat second, so clues are one scroll away from the bomb. */
+  .sidepanel .manual { order: -1; }
 }
