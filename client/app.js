@@ -240,10 +240,98 @@ function escapeHtml(s) {
   })[c]);
 }
 
-// -- Game screen, chat, timer, manual, result land in the next commits --------
-function onTick() {}
-function onChat() {}
-function renderGame() {}
+// -- Game screen: timer, strikes, bomb ---------------------------------------
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function onTick(remaining) {
+  const el = $("#timer");
+  el.textContent = fmtTime(remaining);
+  el.classList.toggle("low", remaining <= 30);
+}
+
+function toast(text) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+const KEYPAD_SYMBOLS = ["Ω", "Ψ", "★", "♠", "♣", "♥", "♦", "✚"];
+
+function renderGame(s) {
+  $("#game-code").textContent = s.code;
+  onTick(s.remaining != null ? s.remaining : 150);
+
+  const strikes = "✖".repeat(s.strikes) + "○".repeat(Math.max(0, s.maxStrikes - s.strikes));
+  $("#strikes").textContent = strikes.split("").join(" ");
+
+  const bomb = $("#bomb");
+  bomb.innerHTML = "";
+
+  // Module 1: wires
+  const wires = document.createElement("div");
+  wires.className = "module" + (s.wires.defused ? " done" : "");
+  wires.innerHTML = "<h3>Module 1 — Wires</h3>";
+  const wireBox = document.createElement("div");
+  wireBox.className = "wires";
+  s.wires.display.forEach((color, i) => {
+    const w = document.createElement("div");
+    w.className = `wire ${color}` + (s.wires.cut[i] ? " cut" : "");
+    w.title = s.wires.cut[i] ? `${color} (cut)` : `Cut the ${color} wire`;
+    if (!s.wires.cut[i] && !s.wires.defused) {
+      w.addEventListener("click", () => send({ t: "action", module: "wires", wire: i }));
+    }
+    wireBox.appendChild(w);
+  });
+  wires.appendChild(wireBox);
+  bomb.appendChild(wires);
+
+  // Module 2: keypad
+  const keypad = document.createElement("div");
+  keypad.className = "module" + (s.keypad.defused ? " done" : "");
+  keypad.innerHTML = "<h3>Module 2 — Keypad</h3>";
+  const keys = document.createElement("div");
+  keys.className = "keypad";
+  KEYPAD_SYMBOLS.forEach((sym) => {
+    const b = document.createElement("button");
+    b.className = "key" + (s.keypad.pressed.includes(sym) ? " pressed" : "");
+    b.textContent = sym;
+    if (!s.keypad.defused) {
+      b.addEventListener("click", () => send({ t: "action", module: "keypad", symbol: sym }));
+    }
+    keys.appendChild(b);
+  });
+  keypad.appendChild(keys);
+  bomb.appendChild(keypad);
+
+  // Module 3: button (interactions land in the next commit)
+  const btnMod = document.createElement("div");
+  btnMod.className = "module" + (s.button.defused ? " done" : "");
+  btnMod.innerHTML = "<h3>Module 3 — Button</h3>";
+  const big = document.createElement("button");
+  big.id = "big-button";
+  big.className = `bigbutton ${s.button.color}`;
+  big.textContent = s.button.label;
+  big.disabled = s.button.defused;
+  btnMod.appendChild(big);
+  const bhint = document.createElement("p");
+  bhint.className = "hint";
+  bhint.textContent = "Click = press · hold = hold 3s · double-click = press twice";
+  btnMod.appendChild(bhint);
+  bomb.appendChild(btnMod);
+  wireButtonInteractions(big);
+
+  renderManual();
+}
+
+// -- Manual panel, module interactions, chat land in the next commits --------
 function renderManual() {}
+function wireButtonInteractions() {}
+function onChat() {}
 function onResult() {}
-function toast() {}
