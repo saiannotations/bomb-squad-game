@@ -225,6 +225,24 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .overlay.win h2 { color: var(--ok); }
 .overlay.lose h2 { color: var(--danger); }
 
+/* Strike feedback: red vignette flash + screen shake. */
+#strike-flash {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 40, 60, 0.55));
+  opacity: 0;
+  z-index: 15;
+}
+#strike-flash.show { animation: strikeflash 0.6s ease-out; }
+@keyframes strikeflash { 0% { opacity: 1; } 100% { opacity: 0; } }
+body.shake { animation: screenshake 0.4s; }
+@keyframes screenshake {
+  0%, 100% { transform: translate(0); }
+  25% { transform: translate(-6px, 3px); }
+  50% { transform: translate(5px, -4px); }
+  75% { transform: translate(-3px, -2px); }
+}
+
 .toast {
   position: fixed; bottom: 1rem; left: 50%;
   transform: translateX(-50%);
@@ -233,7 +251,24 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   z-index: 20;
 }
 
-/* Mobile: stack the side panel under the bomb. (Expanded in a later PR.) */
+/* Mobile: stack the side panel under the bomb, keep the timer visible,
+   and grow touch targets. */
 @media (max-width: 860px) {
   .gamegrid { grid-template-columns: 1fr; }
+
+  .gamebar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .wire { height: 34px; border-radius: 17px; }
+  .key { font-size: 2rem; min-height: 64px; }
+  .bigbutton { width: 170px; height: 170px; }
+
+  .chatlog { height: 160px; }
+
+  /* Manual first, chat second, so clues are one scroll away from the bomb. */
+  .sidepanel .manual { order: -1; }
 }
