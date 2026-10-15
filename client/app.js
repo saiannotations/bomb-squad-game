@@ -234,6 +234,24 @@ function renderLobby(s) {
 $("#btn-add-bot").addEventListener("click", () => send({ t: "add_bot" }));
 $("#btn-start").addEventListener("click", () => send({ t: "start" }));
 
+// Invite links: copy a join URL, and pre-fill the code when one is opened.
+$("#btn-copy-link").addEventListener("click", async () => {
+  const link = `${location.origin}${location.pathname}?room=${app.code}`;
+  try {
+    await navigator.clipboard.writeText(link);
+    toast("Invite link copied!");
+  } catch {
+    prompt("Copy this invite link:", link);
+  }
+});
+
+(function initInviteParam() {
+  const room = new URLSearchParams(location.search).get("room");
+  if (room && /^[A-Za-z0-9]{4}$/.test(room)) {
+    $("#input-code").value = room.toUpperCase();
+  }
+})();
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
