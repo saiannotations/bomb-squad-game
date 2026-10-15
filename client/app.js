@@ -397,6 +397,56 @@ function wireButtonInteractions(big) {
   });
 }
 
-// -- Chat and result land in the next commit --------------------------------
-function onChat() {}
-function onResult() {}
+// -- Chat --------------------------------------------------------------------
+
+function onChat(from, text, skipScroll) {
+  const log = $("#chat-log");
+  const div = document.createElement("div");
+  if (from === "SYSTEM") {
+    div.className = "sys";
+    div.textContent = text;
+  } else {
+    const who = document.createElement("span");
+    who.className = "who";
+    who.textContent = from + ": ";
+    div.appendChild(who);
+    div.appendChild(document.createTextNode(text));
+  }
+  log.appendChild(div);
+  if (!skipScroll) log.scrollTop = log.scrollHeight;
+}
+
+function sendChat() {
+  const input = $("#chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  send({ t: "chat", text: text.slice(0, 300) });
+  input.value = "";
+}
+
+$("#btn-send").addEventListener("click", sendChat);
+$("#chat-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendChat();
+});
+
+// -- Result overlay ------------------------------------------------------------
+
+function onResult(win, reason) {
+  const overlay = $("#result-overlay");
+  overlay.classList.remove("hidden", "win", "lose");
+  overlay.classList.add(win ? "win" : "lose");
+  $("#result-title").textContent = win ? "🎉 Bomb defused!" : "💥 Boom.";
+  $("#result-reason").textContent = reason || "";
+  store.clear(); // game is over; don't offer rejoin
+}
+
+$("#btn-back-lobby").addEventListener("click", () => {
+  if (app.ws) app.ws.close();
+  app.ws = null;
+  app.playerId = null;
+  app.manual = null;
+  app.state = null;
+  $("#result-overlay").classList.add("hidden");
+  $("#chat-log").innerHTML = "";
+  show("home");
+});
